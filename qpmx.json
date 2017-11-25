@@ -1,0 +1,28 @@
+{
+    "dependencies": [
+    ],
+    "license": {
+        "file": "LICENSE",
+        "name": "BSD_3_CLAUSE"
+    },
+    "prcFile": "",
+    "priFile": "qpipedevice.pri",
+    "priIncludes": [
+    ],
+    "publishers": {
+        "qpm": {
+            "author": {
+                "email": "skycoder42.de@gmx.de",
+                "name": "Skycoder"
+            },
+            "description": "A collection of QIODevice classes used for \"piping\" things between devices",
+            "name": "de.skycoder42.qpipedevice",
+            "repository": {
+                "type": "GITHUB",
+                "url": "https://github.com/Skycoder42/QPipeDevice.git"
+            },
+            "webpage": "https://github.com/Skycoder42/QPipeDevice"
+        }
+    },
+    "source": false
+}
