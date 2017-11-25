@@ -35,6 +35,8 @@ public slots:
 	void setAutoClose(bool autoClose);
 
 	void flush();
+	bool pipeWrite(const QByteArray &data);
+	bool pipeClose();
 
 signals:
 	void finished();

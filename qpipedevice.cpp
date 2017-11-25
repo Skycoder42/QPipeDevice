@@ -129,6 +129,22 @@ void QPipeDevice::flush()
 	readyRead();
 }
 
+bool QPipeDevice::pipeWrite(const QByteArray &data)
+{
+	if(_source || _sourcePipe)
+		return false;
+	pipeData(data);
+	return true;
+}
+
+bool QPipeDevice::pipeClose()
+{
+	if(_source || _sourcePipe)
+		return false;
+	close();
+	return true;
+}
+
 QByteArray QPipeDevice::process(QByteArray data)
 {
 	return data;
