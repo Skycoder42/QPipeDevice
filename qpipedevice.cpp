@@ -98,7 +98,7 @@ QPipeDevice *QPipeDevice::pipeFrom(QIODevice *source)
 		connect(_source, &QIODevice::readyRead,
 				this, &QPipeDevice::readyRead);
 		connect(_source, &QIODevice::readChannelFinished,
-				this, &QPipeDevice::readClosed);
+				this, &QPipeDevice::close);
 		connect(_source, &QIODevice::aboutToClose,
 				this, &QPipeDevice::close);
 
@@ -124,6 +124,11 @@ void QPipeDevice::setAutoClose(bool autoClose)
 	_autoClose = autoClose;
 }
 
+void QPipeDevice::flush()
+{
+	readyRead();
+}
+
 QByteArray QPipeDevice::process(QByteArray data)
 {
 	return data;
@@ -133,7 +138,7 @@ void QPipeDevice::end() {}
 
 void QPipeDevice::readyRead()
 {
-	if(!_source)
+	if(!_source || !_source->isOpen() || _source->bytesAvailable() == 0)
 		return;
 
 	if(_blockSize == 0)
@@ -147,15 +152,9 @@ void QPipeDevice::readyRead()
 	}
 }
 
-void QPipeDevice::readClosed()
-{
-	end();
-	if(_sinkPipe)
-		_sinkPipe->readClosed();
-}
-
 void QPipeDevice::close()
 {
+	end();
 	if(_sinkPipe)
 		_sinkPipe->close();
 	else if(_sink && _autoClose)
@@ -177,12 +176,19 @@ QPointer<QPipeDevice> operator|(QPointer<QPipeDevice> source, QPointer<QPipeDevi
 	return source->pipeTo(sink);
 }
 
-void operator|(QPointer<QPipeDevice> source, QPointer<QIODevice> sink)
+QPipeDevice &operator|(QPipeDevice &source, QPipeDevice &sink)
 {
-	return source->pipeTo(sink);
+	source.pipeTo(&sink);
+	return sink;
 }
 
-QPointer<QPipeDevice> operator|(QPointer<QIODevice> source, QPointer<QPipeDevice> sink)
+void operator|(QPipeDevice &source, QIODevice &sink)
 {
-	return sink->pipeFrom(source);
+	source.pipeTo(&sink);
+}
+
+QPipeDevice &operator|(QIODevice &source, QPipeDevice &sink)
+{
+	sink.pipeFrom(&source);
+	return sink;
 }
