@@ -36,6 +36,9 @@ public slots:
 
 	void flush();
 
+signals:
+	void finished();
+
 protected:
 	virtual QByteArray process(QByteArray data);
 	virtual void end();

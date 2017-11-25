@@ -155,6 +155,7 @@ void QPipeDevice::readyRead()
 void QPipeDevice::close()
 {
 	end();
+	emit finished();
 	if(_sinkPipe)
 		_sinkPipe->close();
 	else if(_sink && _autoClose)

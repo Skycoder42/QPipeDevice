@@ -23,7 +23,6 @@ QByteArray QTeePipe::process(QByteArray data)
 
 void QTeePipe::end()
 {
-	emit finished();
 	if(_teeDevice && autoClose() && _teeDevice->isOpen())
 		_teeDevice->close();
 }
