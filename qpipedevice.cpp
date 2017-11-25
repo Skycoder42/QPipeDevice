@@ -10,55 +10,12 @@ QPipeDevice::QPipeDevice(QObject *parent) :
 	_autoClose(false)
 {}
 
-void QPipeDevice::pipeTo(QPipeDevice *pipeSink)
-{
-	if(_sinkPipe) {
-		_sinkPipe->_sourcePipe = nullptr;
-		_sinkPipe = nullptr;
-	}
-
-	if(_sink) //reset sink, if needed
-		setSink(_sink);
-
-	if(pipeSink) {
-		_sinkPipe = pipeSink;
-		_sinkPipe->_sourcePipe = this;
-	}
-}
-
-void QPipeDevice::pipeFrom(QPipeDevice *pipeSource)
-{
-	if(_sourcePipe)
-		_sourcePipe->pipeTo(nullptr);//will reset this as well
-	if(_source)
-		setSource(nullptr);//reset source, if needed
-	if(pipeSource)
-		pipeSource->pipeTo(this);//will setup this as well
-}
-
-QPipeDevice &QPipeDevice::operator|(QPipeDevice &other)
-{
-	pipeTo(&other);
-	return other;
-}
-
-void QPipeDevice::operator|(QIODevice *device)
-{
-	setSink(device);
-}
-
-QPipeDevice &operator|(QIODevice *device, QPipeDevice &pipe)
-{
-	pipe.setSource(device);
-	return pipe;
-}
-
-QIODevice *QPipeDevice::source() const
+QIODevice *QPipeDevice::sourceDevice() const
 {
 	return _source;
 }
 
-QIODevice *QPipeDevice::sink() const
+QIODevice *QPipeDevice::sinkDevice() const
 {
 	return _sink;
 }
@@ -83,7 +40,49 @@ bool QPipeDevice::autoClose() const
 	return _autoClose;
 }
 
-void QPipeDevice::setSource(QIODevice *source)
+QPipeDevice *QPipeDevice::pipeTo(QPipeDevice *sink)
+{
+	if(_sinkPipe) {
+		_sinkPipe->_sourcePipe = nullptr;
+		_sinkPipe = nullptr;
+	}
+
+	if(_sink) //reset sink, if needed
+		pipeTo((QIODevice*)nullptr);
+
+	if(sink) {
+		_sinkPipe = sink;
+		_sinkPipe->_sourcePipe = this;
+	}
+
+	return sink;
+}
+
+void QPipeDevice::pipeTo(QIODevice *sink)
+{
+	if(_sink)
+		_sink = nullptr;
+
+	if(_sinkPipe)
+		pipeTo((QPipeDevice*)nullptr);
+
+	if(sink)
+		_sink = sink;
+}
+
+QPipeDevice *QPipeDevice::pipeFrom(QPipeDevice *source)
+{
+	if(_sourcePipe)
+		_sourcePipe->pipeTo((QPipeDevice*)nullptr);//will reset this as well
+	if(_source)
+		pipeFrom((QIODevice*)nullptr);//reset source, if needed
+	if(source)
+		source->pipeTo(this);//will setup this as well
+
+	return this;
+}
+
+QPipeDevice *QPipeDevice::pipeFrom(QIODevice *source)
 {
 	if(_source) {
 		_source->disconnect(this);
@@ -91,7 +90,7 @@ void QPipeDevice::setSource(QIODevice *source)
 	}
 
 	if(_sourcePipe)
-		pipeFrom(nullptr);
+		pipeFrom((QPipeDevice*)nullptr);
 
 	if(source) {
 		_source = source;
@@ -106,20 +105,8 @@ void QPipeDevice::setSource(QIODevice *source)
 		if(_source->isReadable() && _source->bytesAvailable() > 0ll)
 			QMetaObject::invokeMethod(this, "readyRead", Qt::QueuedConnection);
 	}
-}
 
-void QPipeDevice::setSink(QIODevice *sink)
-{
-	if(_sink) {
-		_sink->disconnect(this);
-		_sink = nullptr;
-	}
-
-	if(_sinkPipe)
-		pipeTo(nullptr);
-
-	if(sink)
-		_sink = sink;
+	return this;
 }
 
 void QPipeDevice::setBlockSize(qint64 blockSize)
@@ -181,4 +168,21 @@ void QPipeDevice::pipeData(const QByteArray &data)
 		_sinkPipe->pipeData(process(data));
 	else if(_sink)
 		_sink->write(process(data));
+}
+
+
+
+QPointer<QPipeDevice> operator|(QPointer<QPipeDevice> source, QPointer<QPipeDevice> sink)
+{
+	return source->pipeTo(sink);
+}
+
+void operator|(QPointer<QPipeDevice> source, QPointer<QIODevice> sink)
+{
+	return source->pipeTo(sink);
+}
+
+QPointer<QPipeDevice> operator|(QPointer<QIODevice> source, QPointer<QPipeDevice> sink)
+{
+	return sink->pipeFrom(source);
 }

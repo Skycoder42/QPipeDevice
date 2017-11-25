@@ -2,13 +2,11 @@
 #define QPIPEDEVICE_H
 
 #include <QIODevice>
+#include <QPointer>
 
 class QPipeDevice : public QObject
 {
 	Q_OBJECT
-
-	Q_PROPERTY(QIODevice* source READ source WRITE setSource)
-	Q_PROPERTY(QIODevice* sink READ sink WRITE setSink)
 
 	Q_PROPERTY(qint64 blockSize READ blockSize WRITE setBlockSize RESET resetBlockSize)
 	Q_PROPERTY(bool autoClose READ autoClose WRITE setAutoClose)
@@ -16,23 +14,20 @@ class QPipeDevice : public QObject
 public:
 	explicit QPipeDevice(QObject *parent = nullptr);
 
-	QIODevice* source() const;
-	QIODevice* sink() const;
+	QIODevice* sourceDevice() const;
+	QIODevice* sinkDevice() const;
 	QPipeDevice* sourcePipe() const;
 	QPipeDevice* sinkPipe() const;
-
-	void pipeTo(QPipeDevice *pipeSink);
-	void pipeFrom(QPipeDevice *pipeSource);
-
-	QPipeDevice &operator|(QPipeDevice &other);
-	void operator|(QIODevice *device);
 
 	qint64 blockSize() const;
 	bool autoClose() const;
 
+	QPipeDevice* pipeTo(QPipeDevice *sink);
+	void pipeTo(QIODevice* sink);
+	QPipeDevice* pipeFrom(QPipeDevice *source);
+	QPipeDevice* pipeFrom(QIODevice* source);
+
 public slots:
-	void setSource(QIODevice* source);
-	void setSink(QIODevice* sink);
 	void setBlockSize(qint64 blockSize);
 	void resetBlockSize();
 	void setAutoClose(bool autoClose);
@@ -57,6 +52,8 @@ private:
 	bool _autoClose;
 };
 
-QPipeDevice &operator|(QIODevice *device, QPipeDevice &pipe);
+QPointer<QPipeDevice> operator|(QPointer<QPipeDevice> source, QPointer<QPipeDevice> sink);
+void operator|(QPointer<QPipeDevice> source, QPointer<QIODevice> sink);
+QPointer<QPipeDevice> operator|(QPointer<QIODevice> source, QPointer<QPipeDevice> sink);
 
 #endif // QPIPEDEVICE_H
