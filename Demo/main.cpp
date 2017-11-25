@@ -2,6 +2,7 @@
 
 #include <QBuffer>
 #include <QDebug>
+#include <qhashpipe.h>
 #include <qpipedevice.h>
 #include <qteepipe.h>
 
@@ -25,12 +26,15 @@ int main(int argc, char *argv[])
 	tee.setAutoClose(true);
 	tee.setTeeDevice(&teeBuffer);
 
-	inBuffer | pipe | tee | outBuffer;
+	QHashPipe hashPipe(QCryptographicHash::Sha3_256);
+
+	inBuffer | pipe | tee | hashPipe | outBuffer;
 	pipe.flush();
 	inBuffer.close();
 
 	qDebug() << "out buffer" << outBuffer.isOpen() << outBuffer.data();
 	qDebug() << "tee buffer" << teeBuffer.isOpen() << teeBuffer.data();
+	qDebug() << "SHA3_256" << hashPipe.hash().toHex();
 
 	return 0;
 }

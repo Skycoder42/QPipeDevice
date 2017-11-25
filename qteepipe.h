@@ -18,7 +18,7 @@ public slots:
 	void setTeeDevice(QIODevice* teeDevice);
 
 signals:
-	void finished();
+	void finished();//TODO move to base
 
 protected:
 	QByteArray process(QByteArray data) override;
