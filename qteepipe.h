@@ -10,6 +10,7 @@ class QTeePipe : public QPipeDevice
 	Q_PROPERTY(QIODevice* teeDevice READ teeDevice WRITE setTeeDevice)
 
 public:
+	explicit QTeePipe(QIODevice* teeDevice, QObject *parent = nullptr);
 	explicit QTeePipe(QObject *parent = nullptr);
 
 	QIODevice* teeDevice() const;
@@ -18,7 +19,8 @@ public slots:
 	void setTeeDevice(QIODevice* teeDevice);
 
 protected:
-	QByteArray process(QByteArray data) override;
+	void init(bool buffered) override;
+	QByteArray process(QByteArray &&data) override;
 	void end() override;
 
 private:

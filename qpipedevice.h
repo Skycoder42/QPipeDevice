@@ -6,74 +6,57 @@
 
 #include <functional>
 
-class QPipeDevice : public QObject
+class QPipeDevice : public QIODevice
 {
 	Q_OBJECT
 
-	Q_PROPERTY(qint64 blockSize READ blockSize WRITE setBlockSize RESET resetBlockSize)
+	Q_PROPERTY(bool autoOpen READ autoOpen WRITE setAutoOpen)
 	Q_PROPERTY(bool autoClose READ autoClose WRITE setAutoClose)
 
 public:
 	explicit QPipeDevice(QObject *parent = nullptr);
 
-	QIODevice* sourceDevice() const;
-	QIODevice* sinkDevice() const;
-	QPipeDevice* sourcePipe() const;
-	QPipeDevice* sinkPipe() const;
-
-	qint64 blockSize() const;
+	QIODevice* sink() const;
+	bool autoOpen() const;
 	bool autoClose() const;
 
 	QPipeDevice* pipeTo(QPipeDevice *sink);
 	void pipeTo(QIODevice* sink);
-	QPipeDevice* pipeFrom(QPipeDevice *source);
-	QPipeDevice* pipeFrom(QIODevice* source);
+
+	bool isSequential() const final;
+	bool open(bool buffered = true);
+	void close() final;
 
 public slots:
-	void setBlockSize(qint64 blockSize);
-	void resetBlockSize();
+	void setAutoOpen(bool autoOpen);
 	void setAutoClose(bool autoClose);
 
-	void flush();
-	bool pipeWrite(const QByteArray &data);
-	bool pipeClose();
-
-signals:
-	void finished();
-
 protected:
-	virtual QByteArray process(QByteArray data);
+	qint64 readData(char *data, qint64 maxlen) final;
+	qint64 writeData(const char *data, qint64 len) final;
+
+	virtual void init(bool buffered);
+	virtual QByteArray process(QByteArray &&data);
 	virtual void end();
 
-private slots:
-	void readyRead();
-	void close();
-	void pipeData(const QByteArray &data);
-
 private:
-	QIODevice* _source;
-	QPipeDevice *_sourcePipe;
 	QIODevice* _sink;
-	QPipeDevice *_sinkPipe;
 
 	qint64 _blockSize;
+	bool _autoOpen;
 	bool _autoClose;
+
+	bool open(OpenMode mode) final;
 };
 
-QPointer<QPipeDevice> operator|(QPointer<QPipeDevice> source, QPointer<QPipeDevice> sink);
 template <typename T>
 void operator|(QPointer<QPipeDevice> source, QPointer<T> sink) {
 	static_assert(std::is_base_of<QIODevice, T>::value, "only QIODevice based classes can be piped");
 	return source->pipeTo(sink);
 }
-template <typename T>
-QPointer<QPipeDevice> operator|(QPointer<T> source, QPointer<QPipeDevice> sink) {
-	static_assert(std::is_base_of<QIODevice, T>::value, "only QIODevice based classes can be piped");
-	return sink->pipeFrom(source);
-}
+QPointer<QPipeDevice> operator|(QPointer<QPipeDevice> source, QPointer<QPipeDevice> sink);
 
 QPipeDevice &operator|(QPipeDevice &source, QPipeDevice &sink);
 void operator|(QPipeDevice &source, QIODevice &sink);
-QPipeDevice &operator|(QIODevice &source, QPipeDevice &sink);
 
 #endif // QPIPEDEVICE_H

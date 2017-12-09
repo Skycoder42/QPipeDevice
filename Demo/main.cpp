@@ -10,7 +10,7 @@
 class SamplePipe : public QPipeDevice
 {
 protected:
-	inline QByteArray process(QByteArray data) override {
+	inline QByteArray process(QByteArray &&data) override {
 		return data.replace('o', '0');
 	}
 };
@@ -19,31 +19,20 @@ int main(int argc, char *argv[])
 {
 	QCoreApplication a(argc, argv);
 
-	QBuffer inBuffer;
-	inBuffer.setData("Hello World!");
-	inBuffer.open(QIODevice::ReadOnly);
-
-	QBuffer outBuffer;
-	outBuffer.open(QIODevice::WriteOnly);
+	QBuffer teeBuffer;
 
 	QPipeDevice pipe;
-	pipe.setAutoClose(true);
-
-	QBuffer teeBuffer;
-	teeBuffer.open(QIODevice::WriteOnly);
-	QTeePipe tee;
-	tee.setAutoClose(true);
-	tee.setTeeDevice(&teeBuffer);
-
+	QTeePipe tee(&teeBuffer);
 	QHashPipe hashPipe(QCryptographicHash::Sha3_256);
-
 	QCountPipe countPipe;
-
 	SamplePipe samplePipe;
+	QBuffer outBuffer;
 
-	inBuffer | pipe | tee | hashPipe | countPipe | samplePipe | outBuffer;
-	pipe.flush();
-	inBuffer.close();
+	pipe | tee | hashPipe | countPipe | samplePipe | outBuffer;
+
+	pipe.open();
+	pipe.write("Hello World!");
+	pipe.close();
 
 	qDebug() << "out buffer:" << outBuffer.isOpen() << outBuffer.data();
 	qDebug() << "tee buffer:" << teeBuffer.isOpen() << teeBuffer.data();

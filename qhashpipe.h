@@ -12,10 +12,10 @@ public:
 	explicit QHashPipe(QCryptographicHash::Algorithm algorithm, QObject *parent = nullptr);
 
 	QByteArray hash() const;
-	void reset();
+	void resetHash();
 
 protected:
-	QByteArray process(QByteArray data) override;
+	QByteArray process(QByteArray &&data) override;
 
 private:
 	QCryptographicHash _hash;

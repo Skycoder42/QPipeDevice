@@ -18,7 +18,7 @@ public slots:
 	void resetCount();
 
 protected:
-	QByteArray process(QByteArray data) override;
+	QByteArray process(QByteArray &&data) override;
 
 private:
 	qint64 _count;

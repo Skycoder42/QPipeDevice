@@ -1,38 +1,20 @@
 #include "qpipedevice.h"
 
 QPipeDevice::QPipeDevice(QObject *parent) :
-	QObject(parent),
-	_source(nullptr),
-	_sourcePipe(nullptr),
+	QIODevice(parent),
 	_sink(nullptr),
-	_sinkPipe(nullptr),
-	_blockSize(1ll * 1024ll * 1024ll), //1MB blocksize
-	_autoClose(false)
+	_autoOpen(true),
+	_autoClose(true)
 {}
 
-QIODevice *QPipeDevice::sourceDevice() const
-{
-	return _source;
-}
-
-QIODevice *QPipeDevice::sinkDevice() const
+QIODevice *QPipeDevice::sink() const
 {
 	return _sink;
 }
 
-QPipeDevice *QPipeDevice::sourcePipe() const
+bool QPipeDevice::autoOpen() const
 {
-	return _sourcePipe;
-}
-
-QPipeDevice *QPipeDevice::sinkPipe() const
-{
-	return _sinkPipe;
-}
-
-qint64 QPipeDevice::blockSize() const
-{
-	return _blockSize;
+	return _autoOpen;
 }
 
 bool QPipeDevice::autoClose() const
@@ -42,81 +24,49 @@ bool QPipeDevice::autoClose() const
 
 QPipeDevice *QPipeDevice::pipeTo(QPipeDevice *sink)
 {
-	if(_sinkPipe) {
-		_sinkPipe->_sourcePipe = nullptr;
-		_sinkPipe = nullptr;
-	}
-
-	if(_sink) //reset sink, if needed
-		pipeTo((QIODevice*)nullptr);
-
-	if(sink) {
-		_sinkPipe = sink;
-		_sinkPipe->_sourcePipe = this;
-	}
-
+	_sink = sink;
 	return sink;
 }
 
 void QPipeDevice::pipeTo(QIODevice *sink)
 {
-	if(_sink)
-		_sink = nullptr;
-
-	if(_sinkPipe)
-		pipeTo((QPipeDevice*)nullptr);
-
-	if(sink)
-		_sink = sink;
+	_sink = sink;
 }
 
-QPipeDevice *QPipeDevice::pipeFrom(QPipeDevice *source)
+bool QPipeDevice::isSequential() const
 {
-	if(_sourcePipe)
-		_sourcePipe->pipeTo((QPipeDevice*)nullptr);//will reset this as well
-	if(_source)
-		pipeFrom((QIODevice*)nullptr);//reset source, if needed
-	if(source)
-		source->pipeTo(this);//will setup this as well
-
-	return this;
+	return true;
 }
 
-QPipeDevice *QPipeDevice::pipeFrom(QIODevice *source)
+bool QPipeDevice::open(bool buffered)
 {
-	if(_source) {
-		_source->disconnect(this);
-		_source = nullptr;
+	if(!_sink) {
+		setErrorString(tr("Cannot open pipe without setting a sink device"));
+		return false;
 	}
 
-	if(_sourcePipe)
-		pipeFrom((QPipeDevice*)nullptr);
-
-	if(source) {
-		_source = source;
-
-		connect(_source, &QIODevice::readyRead,
-				this, &QPipeDevice::readyRead);
-		connect(_source, &QIODevice::readChannelFinished,
-				this, &QPipeDevice::close);
-		connect(_source, &QIODevice::aboutToClose,
-				this, &QPipeDevice::close);
-
-		if(_source->isReadable() && _source->bytesAvailable() > 0ll)
-			QMetaObject::invokeMethod(this, "readyRead", Qt::QueuedConnection);
-	}
-
-	return this;
+	auto mMode = WriteOnly | (buffered ? NotOpen : Unbuffered);
+	if(QIODevice::open(mMode)) {
+		init(buffered);
+		if(_autoOpen)
+			return _sink->open(mMode);
+		else
+			return true;
+	} else
+		return false;
 }
 
-void QPipeDevice::setBlockSize(qint64 blockSize)
+void QPipeDevice::close()
 {
-	_blockSize = blockSize;
+	end();
+	QIODevice::close();
+	if(_autoClose && _sink)
+		_sink->close();
 }
 
-void QPipeDevice::resetBlockSize()
+void QPipeDevice::setAutoOpen(bool autoOpen)
 {
-	setBlockSize(1ll * 1024ll * 1024ll);
+	_autoOpen = autoOpen;
 }
 
 void QPipeDevice::setAutoClose(bool autoClose)
@@ -124,67 +74,49 @@ void QPipeDevice::setAutoClose(bool autoClose)
 	_autoClose = autoClose;
 }
 
-void QPipeDevice::flush()
+qint64 QPipeDevice::readData(char *data, qint64 maxlen)
 {
-	readyRead();
+	Q_UNUSED(data)
+	Q_UNUSED(maxlen)
+	return 0;
 }
 
-bool QPipeDevice::pipeWrite(const QByteArray &data)
+qint64 QPipeDevice::writeData(const char *data, qint64 len)
 {
-	if(_source || _sourcePipe)
-		return false;
-	pipeData(data);
-	return true;
+	auto nData = process(QByteArray(data, len));
+	if(_sink) {
+		auto r = _sink->write(nData);
+		if(r != nData.size()) {
+			setErrorString(tr("Failed to write transformed data to sink"));
+			return -1;
+		} else
+			return len;
+	} else
+		return -1;
 }
 
-bool QPipeDevice::pipeClose()
+void QPipeDevice::init(bool buffered)
 {
-	if(_source || _sourcePipe)
-		return false;
-	close();
-	return true;
+	Q_UNUSED(buffered)
 }
 
-QByteArray QPipeDevice::process(QByteArray data)
+QByteArray QPipeDevice::process(QByteArray &&data)
 {
 	return data;
 }
 
 void QPipeDevice::end() {}
 
-void QPipeDevice::readyRead()
+bool QPipeDevice::open(OpenMode mode)
 {
-	if(!_source || !_source->isOpen() || _source->bytesAvailable() == 0)
-		return;
-
-	if(_blockSize == 0)
-		pipeData(_source->readAll());
-	else {
-		qint64 count = 0;
-		while((count = _source->bytesAvailable()) > 0) {
-			count = qMin(count, _blockSize);
-			pipeData(_source->read(count));
-		}
-	}
+	if(mode.testFlag(ReadOnly) ||
+	   mode.testFlag(Text))
+		return false;
+	else
+		return open(mode.testFlag(Unbuffered));
 }
 
-void QPipeDevice::close()
-{
-	end();
-	emit finished();
-	if(_sinkPipe)
-		_sinkPipe->close();
-	else if(_sink && _autoClose)
-		_sink->close();
-}
 
-void QPipeDevice::pipeData(const QByteArray &data)
-{
-	if(_sinkPipe)
-		_sinkPipe->pipeData(process(data));
-	else if(_sink)
-		_sink->write(process(data));
-}
 
 
 
@@ -202,10 +134,4 @@ QPipeDevice &operator|(QPipeDevice &source, QPipeDevice &sink)
 void operator|(QPipeDevice &source, QIODevice &sink)
 {
 	source.pipeTo(&sink);
-}
-
-QPipeDevice &operator|(QIODevice &source, QPipeDevice &sink)
-{
-	sink.pipeFrom(&source);
-	return sink;
 }

@@ -10,12 +10,12 @@ QByteArray QHashPipe::hash() const
 	return _hash.result();
 }
 
-void QHashPipe::reset()
+void QHashPipe::resetHash()
 {
 	_hash.reset();
 }
 
-QByteArray QHashPipe::process(QByteArray data)
+QByteArray QHashPipe::process(QByteArray &&data)
 {
 	_hash.addData(data);
 	return data;

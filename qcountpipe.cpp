@@ -15,7 +15,7 @@ void QCountPipe::resetCount()
 	_count = 0;
 }
 
-QByteArray QCountPipe::process(QByteArray data)
+QByteArray QCountPipe::process(QByteArray &&data)
 {
 	_count += (qint64)data.size();
 	return data;
